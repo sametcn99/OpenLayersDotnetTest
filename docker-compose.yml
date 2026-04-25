@@ -1,0 +1,65 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openlayers_demo
+      POSTGRES_USER: openlayers
+      POSTGRES_PASSWORD: openlayers_dev_password
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgis-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openlayers -d openlayers_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    networks:
+      - geo-stack
+
+  app:
+    build:
+      context: .
+      dockerfile: OpenLayersDotnetTest/Dockerfile
+      target: development
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: 8080
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+      Database__ConnectionString: Host=db;Port=5432;Database=openlayers_demo;Username=openlayers;Password=openlayers_dev_password;Include Error Detail=true
+    ports:
+      - "${APP_HOST_PORT:-5121}:8080"
+    volumes:
+      - .:/src
+      - app-bin:/src/.build/bin
+      - app-obj:/src/.build/obj
+      - app-data-protection:/root/.aspnet/DataProtection-Keys
+      - nuget-packages:/root/.nuget/packages
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: rebuild
+          path: ./OpenLayersDotnetTest/OpenLayersDotnetTest.csproj
+        - action: rebuild
+          path: ./OpenLayersDotnetTest/Dockerfile
+        - action: rebuild
+          path: ./docker-compose.yml
+    networks:
+      - geo-stack
+
+networks:
+  geo-stack:
+    driver: bridge
+
+volumes:
+  postgis-data:
+  app-bin:
+  app-obj:
+  app-data-protection:
+  nuget-packages:

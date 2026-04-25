@@ -1,0 +1,79 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject IJSRuntime JsRuntime
+@inject ILogger<Home> Logger
+
+<PageTitle>OpenLayers PostGIS Demo</PageTitle>
+
+<section class="geo-shell">
+	<aside class="geo-panel" aria-label="Map data summary">
+		<p class="eyebrow">PostGIS / PostgreSQL / GeoJSON</p>
+		<h1>Istanbul Spatial Lab</h1>
+		<p class="lede">A compact integration surface for testing spatial storage, GeoJSON output, and OpenLayers rendering.</p>
+
+		<dl class="metric-grid">
+			<div>
+				<dt>Database</dt>
+				<dd>PostGIS</dd>
+			</div>
+			<div>
+				<dt>API</dt>
+				<dd>GeoJSON</dd>
+			</div>
+			<div>
+				<dt>Renderer</dt>
+				<dd>OpenLayers</dd>
+			</div>
+		</dl>
+
+		<div id="feature-status" class="feature-status" role="status">@_statusMessage</div>
+	</aside>
+
+	<section class="map-stage" aria-label="Interactive GeoJSON map">
+		<div id="map" class="map-canvas"></div>
+		<div id="feature-details" class="feature-details" aria-live="polite">No feature selected</div>
+	</section>
+</section>
+
+@code {
+	private IJSObjectReference? _mapModule;
+	private string _statusMessage = "Loading spatial features...";
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!firstRender)
+		{
+			return;
+		}
+
+		try
+		{
+			_mapModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/map.js");
+			await _mapModule.InvokeVoidAsync("initializeMap", "map", "feature-status", "feature-details");
+		}
+		catch (JSException exception)
+		{
+			Logger.LogError(exception, "Failed to initialize the OpenLayers map module.");
+			_statusMessage = "Map initialization failed. Check browser and server logs for details.";
+			StateHasChanged();
+		}
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		if (_mapModule is null)
+		{
+			return;
+		}
+
+		try
+		{
+			await _mapModule.InvokeVoidAsync("disposeMap", "map");
+			await _mapModule.DisposeAsync();
+		}
+		catch (JSDisconnectedException)
+		{
+		}
+	}
+}

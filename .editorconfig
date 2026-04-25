@@ -1,0 +1,13 @@
+root = true
+
+[OpenLayersDotnetTest/Program.cs]
+dotnet_diagnostic.CS0246.severity = none
+dotnet_diagnostic.CS1061.severity = none
+
+# IDE0005: Using directive is unnecessary.
+dotnet_diagnostic.IDE0005.severity = none
+
+[OpenLayersDotnetTest/Data/*.cs]
+dotnet_diagnostic.CS0246.severity = none
+dotnet_diagnostic.CS1061.severity = none
+dotnet_diagnostic.CS1929.severity = none
