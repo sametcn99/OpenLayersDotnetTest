@@ -8,9 +8,11 @@
 
 <section class="geo-shell">
 	<aside class="geo-panel" aria-label="Map data summary">
-		<p class="eyebrow">PostGIS / PostgreSQL / GeoJSON</p>
-		<h1>Istanbul Spatial Lab</h1>
-		<p class="lede">A compact integration surface for testing spatial storage, GeoJSON output, and OpenLayers rendering.</p>
+		<div class="geo-panel-copy">
+			<p class="eyebrow">PostGIS / PostgreSQL / GeoJSON</p>
+			<h1>Istanbul Spatial Lab</h1>
+			<p class="lede">A compact integration surface for testing spatial storage, GeoJSON output, and OpenLayers rendering.</p>
+		</div>
 
 		<dl class="metric-grid">
 			<div>
@@ -28,6 +30,58 @@
 		</dl>
 
 		<div id="feature-status" class="feature-status" role="status">@_statusMessage</div>
+
+		<form id="feature-editor" class="feature-editor" aria-label="Create map feature">
+			<div class="feature-editor-heading">
+				<p class="eyebrow">Feature Studio</p>
+				<h2>Create Feature</h2>
+			</div>
+
+			<div class="field-grid">
+				<label class="field-control" for="feature-name">
+					<span>Name</span>
+					<input id="feature-name" name="name" type="text" maxlength="80" autocomplete="off" required />
+				</label>
+
+				<label class="field-control" for="feature-slug">
+					<span>Slug</span>
+					<input id="feature-slug" name="slug" type="text" maxlength="90" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" autocomplete="off" required />
+				</label>
+			</div>
+
+			<div class="field-grid">
+				<label class="field-control" for="feature-geometry">
+					<span>Geometry</span>
+					<select id="feature-geometry" name="geometry">
+						<option value="Point">Point</option>
+						<option value="LineString">Line</option>
+						<option value="Polygon">Polygon</option>
+					</select>
+				</label>
+
+				<label class="field-control" for="feature-category">
+					<span>Category</span>
+					<select id="feature-category" name="category">
+						<option value="landmark">Landmark</option>
+						<option value="route">Route</option>
+						<option value="area">Area</option>
+					</select>
+				</label>
+			</div>
+
+			<label class="field-control" for="feature-description">
+				<span>Description</span>
+				<textarea id="feature-description" name="description" rows="3" maxlength="240" required></textarea>
+			</label>
+
+			<div class="feature-actions">
+				<button id="feature-start-drawing" class="feature-button feature-button-primary" type="button" title="Start drawing the selected geometry">Draw</button>
+				<button id="feature-save" class="feature-button" type="submit" title="Save the drafted feature" disabled>Save</button>
+				<button id="feature-clear" class="feature-button feature-button-quiet" type="button" title="Clear the current draft" disabled>Clear</button>
+			</div>
+
+			<div id="feature-editor-status" class="feature-editor-status" role="status">Ready</div>
+		</form>
 	</aside>
 
 	<section class="map-stage" aria-label="Interactive GeoJSON map">
@@ -50,7 +104,7 @@
 		try
 		{
 			_mapModule = await JsRuntime.InvokeAsync<IJSObjectReference>("import", "./js/map.js");
-			await _mapModule.InvokeVoidAsync("initializeMap", "map", "feature-status", "feature-details");
+			await _mapModule.InvokeVoidAsync("initializeMap", "map", "feature-status", "feature-details", "feature-editor");
 		}
 		catch (JSException exception)
 		{
