@@ -33,6 +33,7 @@ public static class MapFeatureMapper
                 Name = feature.Name,
                 Category = feature.Category,
                 Description = feature.Description,
+                SortOrder = feature.SortOrder,
                 Metadata = ParseMetadata(feature.MetadataJson),
                 CreatedAt = feature.CreatedAt,
                 UpdatedAt = feature.UpdatedAt

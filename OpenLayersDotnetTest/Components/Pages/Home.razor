@@ -8,33 +8,35 @@
 
 <section class="geo-shell">
 	<aside class="geo-panel" aria-label="Map data summary">
-		<div class="geo-panel-copy">
-			<p class="eyebrow">PostGIS / PostgreSQL / GeoJSON</p>
-			<h1>Istanbul Spatial Lab</h1>
-			<p class="lede">A compact integration surface for testing spatial storage, GeoJSON output, and OpenLayers rendering.</p>
+		<div class="geo-panel-summary">
+			<div class="geo-panel-copy">
+				<p class="eyebrow">PostGIS / PostgreSQL / GeoJSON</p>
+				<h1>Istanbul Spatial Lab</h1>
+				<p class="lede">A compact integration surface for testing spatial storage, GeoJSON output, and OpenLayers rendering.</p>
+			</div>
+
+			<dl class="metric-grid">
+				<div>
+					<dt>Database</dt>
+					<dd>PostGIS</dd>
+				</div>
+				<div>
+					<dt>API</dt>
+					<dd>GeoJSON</dd>
+				</div>
+				<div>
+					<dt>Renderer</dt>
+					<dd>OpenLayers</dd>
+				</div>
+			</dl>
+
+			<div id="feature-status" class="feature-status" role="status">@_statusMessage</div>
 		</div>
-
-		<dl class="metric-grid">
-			<div>
-				<dt>Database</dt>
-				<dd>PostGIS</dd>
-			</div>
-			<div>
-				<dt>API</dt>
-				<dd>GeoJSON</dd>
-			</div>
-			<div>
-				<dt>Renderer</dt>
-				<dd>OpenLayers</dd>
-			</div>
-		</dl>
-
-		<div id="feature-status" class="feature-status" role="status">@_statusMessage</div>
 
 		<form id="feature-editor" class="feature-editor" aria-label="Create map feature">
 			<div class="feature-editor-heading">
 				<p class="eyebrow">Feature Studio</p>
-				<h2>Create Feature</h2>
+				<h2 id="feature-editor-title">Create Feature</h2>
 			</div>
 
 			<div class="field-grid">
@@ -77,6 +79,8 @@
 			<div class="feature-actions">
 				<button id="feature-start-drawing" class="feature-button feature-button-primary" type="button" title="Start drawing the selected geometry">Draw</button>
 				<button id="feature-save" class="feature-button" type="submit" title="Save the drafted feature" disabled>Save</button>
+				<button id="feature-edit" class="feature-button" type="button" title="Load the selected feature into the editor" disabled>Edit Selected</button>
+				<button id="feature-delete" class="feature-button feature-button-danger" type="button" title="Delete the selected feature" disabled>Delete</button>
 				<button id="feature-clear" class="feature-button feature-button-quiet" type="button" title="Clear the current draft" disabled>Clear</button>
 			</div>
 

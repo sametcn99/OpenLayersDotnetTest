@@ -108,6 +108,7 @@ export async function initializeMap(containerId, statusId, detailsId, editorId) 
             draftLayer,
             draftSource,
             drawInteraction: null,
+            editingFeatureId: null,
             editor: resolveFeatureEditor(editorId),
             format,
             isSaving: false,
@@ -135,22 +136,8 @@ export async function initializeMap(containerId, statusId, detailsId, editorId) 
                 return;
             }
 
-            const feature = map.forEachFeatureAtPixel(event.pixel, candidate => candidate);
-
-            if (state.selectedFeature) {
-                state.selectedFeature.set('selected', false);
-            }
-
-            state.selectedFeature = feature ?? null;
-
-            if (state.selectedFeature) {
-                state.selectedFeature.set('selected', true);
-                renderFeatureDetails(details, state.selectedFeature);
-            } else {
-                setText(details, 'No feature selected');
-            }
-
-            vectorLayer.changed();
+            const feature = map.forEachFeatureAtPixel(event.pixel, (candidate, layer) => layer === vectorLayer ? candidate : undefined);
+            selectFeature(state, feature ?? null);
         });
 
         map.on('pointermove', event => {
@@ -253,14 +240,17 @@ function resolveFeatureEditor(editorId) {
     const editor = {
         category: root.querySelector('#feature-category'),
         clearButton: root.querySelector('#feature-clear'),
+        deleteButton: root.querySelector('#feature-delete'),
         description: root.querySelector('#feature-description'),
+        editButton: root.querySelector('#feature-edit'),
         form: root,
         geometryType: root.querySelector('#feature-geometry'),
         name: root.querySelector('#feature-name'),
         saveButton: root.querySelector('#feature-save'),
         slug: root.querySelector('#feature-slug'),
         startButton: root.querySelector('#feature-start-drawing'),
-        status: root.querySelector('#feature-editor-status')
+        status: root.querySelector('#feature-editor-status'),
+        title: root.querySelector('#feature-editor-title')
     };
 
     return Object.values(editor).every(Boolean) ? editor : null;
@@ -298,8 +288,16 @@ function bindFeatureEditor(state) {
         startDrawing(state);
     });
 
+    editor.editButton.addEventListener('click', () => {
+        beginEditingSelectedFeature(state);
+    });
+
+    editor.deleteButton.addEventListener('click', async () => {
+        await deleteSelectedFeature(state);
+    });
+
     editor.clearButton.addEventListener('click', () => {
-        clearDraft(state, 'Draft cleared');
+        resetEditor(state, 'Editor reset');
     });
 
     editor.form.addEventListener('submit', async event => {
@@ -307,8 +305,7 @@ function bindFeatureEditor(state) {
         await saveDraftFeature(state);
     });
 
-    editor.category.value = defaultCategoryByGeometry[editor.geometryType.value] ?? 'landmark';
-    updateEditorControls(state, 'Ready');
+    resetEditor(state, 'Ready');
 }
 
 function startDrawing(state) {
@@ -468,32 +465,22 @@ async function saveDraftFeature(state) {
     }
 
     state.isSaving = true;
-    updateEditorControls(state, 'Saving feature');
+    updateEditorControls(state, state.editingFeatureId ? 'Updating feature' : 'Saving feature');
 
     try {
         const geometry = state.format.writeGeometryObject(draftFeature.getGeometry(), {
             dataProjection,
             featureProjection
         });
-        const payload = {
-            category: editor.category.value,
-            description: editor.description.value.trim(),
-            geometry,
-            metadata: {
-                geometryType: geometry.type,
-                source: 'browser-drawing'
-            },
-            name: editor.name.value.trim(),
-            slug: editor.slug.value.trim(),
-            sortOrder: (state.vectorSource.getFeatures().length + 1) * 10
-        };
-        const response = await fetch('/api/features', {
+        const payload = buildFeaturePayload(state, geometry);
+        const isEditing = Boolean(state.editingFeatureId);
+        const response = await fetch(isEditing ? `/api/features/${state.editingFeatureId}` : '/api/features', {
             body: JSON.stringify(payload),
             headers: {
                 Accept: 'application/geo+json',
                 'Content-Type': 'application/json'
             },
-            method: 'POST'
+            method: isEditing ? 'PUT' : 'POST'
         });
 
         if (!response.ok) {
@@ -505,21 +492,11 @@ async function saveDraftFeature(state) {
             dataProjection,
             featureProjection
         });
-
-        if (state.selectedFeature) {
-            state.selectedFeature.set('selected', false);
-        }
-
-        mapFeature.set('selected', true);
-        state.selectedFeature = mapFeature;
-        state.vectorSource.addFeature(mapFeature);
-        state.vectorLayer.changed();
-        state.draftSource.clear();
-
+        applySavedFeature(state, mapFeature);
         setText(state.status, buildStatusText(state.vectorSource.getFeatures()));
         renderFeatureDetails(state.details, mapFeature);
-        resetEditorForNextFeature(state, geometry.type);
-        updateEditorControls(state, 'Saved');
+        resetEditor(state, isEditing ? 'Feature updated' : 'Feature saved');
+        selectFeature(state, mapFeature);
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Feature could not be saved.';
 
@@ -529,6 +506,156 @@ async function saveDraftFeature(state) {
         state.isSaving = false;
         updateEditorControls(state);
     }
+}
+
+async function deleteSelectedFeature(state) {
+    const featureId = state.selectedFeature?.getId();
+
+    if (!featureId || state.isSaving) {
+        return;
+    }
+
+    const featureName = state.selectedFeature?.get('name') ?? 'this feature';
+
+    if (!globalThis.confirm(`Delete ${featureName}?`)) {
+        return;
+    }
+
+    state.isSaving = true;
+    updateEditorControls(state, 'Deleting feature');
+
+    try {
+        const response = await fetch(`/api/features/${featureId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            throw new Error(await readApiError(response));
+        }
+
+        const existingFeature = state.vectorSource.getFeatureById(featureId);
+
+        if (existingFeature) {
+            state.vectorSource.removeFeature(existingFeature);
+        }
+
+        setText(state.status, buildStatusText(state.vectorSource.getFeatures()));
+        setText(state.details, 'No feature selected');
+        resetEditor(state, 'Feature deleted');
+        selectFeature(state, null);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Feature could not be deleted.';
+
+        console.error('Failed to delete selected feature.', error);
+        updateEditorControls(state, message);
+    } finally {
+        state.isSaving = false;
+        updateEditorControls(state);
+    }
+}
+
+function buildFeaturePayload(state, geometry) {
+    const { editor } = state;
+    const selectedFeature = state.selectedFeature;
+
+    return {
+        category: editor.category.value,
+        description: editor.description.value.trim(),
+        geometry,
+        metadata: {
+            ...(selectedFeature?.get('metadata') ?? {}),
+            geometryType: geometry.type,
+            source: state.editingFeatureId ? 'browser-edit' : 'browser-drawing'
+        },
+        name: editor.name.value.trim(),
+        slug: editor.slug.value.trim(),
+        sortOrder: selectedFeature?.get('sortOrder') ?? (state.vectorSource.getFeatures().length + 1) * 10
+    };
+}
+
+function applySavedFeature(state, feature) {
+    const featureId = feature.getId();
+    const existingFeature = featureId ? state.vectorSource.getFeatureById(featureId) : null;
+
+    if (existingFeature) {
+        existingFeature.set('selected', false);
+        state.vectorSource.removeFeature(existingFeature);
+    }
+
+    feature.set('selected', false);
+    state.vectorSource.addFeature(feature);
+    state.vectorLayer.changed();
+}
+
+function selectFeature(state, feature) {
+    const nextFeatureId = feature?.getId() ?? null;
+
+    if (state.editingFeatureId && state.editingFeatureId !== nextFeatureId) {
+        resetEditor(state, 'Edit canceled');
+    }
+
+    if (state.selectedFeature) {
+        state.selectedFeature.set('selected', false);
+    }
+
+    state.selectedFeature = feature;
+
+    if (state.selectedFeature) {
+        state.selectedFeature.set('selected', true);
+        renderFeatureDetails(state.details, state.selectedFeature);
+    } else {
+        setText(state.details, 'No feature selected');
+    }
+
+    state.vectorLayer.changed();
+    updateEditorControls(state);
+}
+
+function beginEditingSelectedFeature(state) {
+    const feature = state.selectedFeature;
+
+    if (!feature || !feature.getId()) {
+        updateEditorControls(state, 'Select a saved feature first');
+        return;
+    }
+
+    const geometryType = feature.getGeometry()?.getType();
+
+    state.editingFeatureId = feature.getId();
+    state.slugTouched = true;
+    state.categoryTouched = true;
+    state.slugSeed = createShortId();
+
+    state.editor.name.value = feature.get('name') ?? '';
+    state.editor.slug.value = feature.get('slug') ?? '';
+    state.editor.description.value = feature.get('description') ?? '';
+    state.editor.geometryType.value = geometryType ?? 'Point';
+    state.editor.category.value = feature.get('category') ?? defaultCategoryByGeometry[geometryType] ?? 'landmark';
+
+    state.draftSource.clear();
+    const draftFeature = feature.clone();
+    draftFeature.set('category', state.editor.category.value);
+    draftFeature.set('draft', true);
+    state.draftSource.addFeature(draftFeature);
+
+    updateEditorControls(state, `Editing ${feature.get('name') ?? 'feature'}`);
+}
+
+function resetEditor(state, message) {
+    stopDrawing(state);
+    state.draftSource.clear();
+    state.editingFeatureId = null;
+    state.slugTouched = false;
+    state.categoryTouched = false;
+    state.slugSeed = createShortId();
+
+    state.editor.name.value = '';
+    state.editor.slug.value = '';
+    state.editor.description.value = '';
+    state.editor.geometryType.value = 'Point';
+    state.editor.category.value = defaultCategoryByGeometry.Point;
+
+    updateEditorControls(state, message);
 }
 
 function resetEditorForNextFeature(state, geometryType) {
@@ -549,11 +676,18 @@ function updateEditorControls(state, message) {
     const { editor } = state;
     const hasDraft = state.draftSource.getFeatures().length > 0;
     const isDrawing = Boolean(state.drawInteraction);
+    const hasSelectedPersistedFeature = Boolean(state.selectedFeature?.getId());
+    const isEditing = Boolean(state.editingFeatureId);
 
     editor.saveButton.disabled = !hasDraft || state.isSaving;
     editor.clearButton.disabled = (!hasDraft && !isDrawing) || state.isSaving;
+    editor.deleteButton.disabled = !hasSelectedPersistedFeature || state.isSaving;
+    editor.editButton.disabled = !hasSelectedPersistedFeature || state.isSaving;
     editor.startButton.disabled = state.isSaving;
     editor.startButton.textContent = isDrawing ? 'Drawing' : 'Draw';
+    editor.saveButton.textContent = isEditing ? 'Update' : 'Save';
+    editor.clearButton.textContent = isEditing || hasDraft ? 'Cancel' : 'Clear';
+    editor.title.textContent = isEditing ? 'Edit Feature' : 'Create Feature';
 
     state.container.classList.toggle('is-drawing', isDrawing);
 

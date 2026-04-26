@@ -38,6 +38,13 @@ public sealed class MapFeatureProperties
     public required string Description { get; init; }
 
     /// <summary>
+    /// Gets the display ordering value.
+    /// </summary>
+    [Description("Display ordering for the feature.")]
+    [JsonPropertyName("sortOrder")]
+    public required int SortOrder { get; init; }
+
+    /// <summary>
     /// Gets arbitrary metadata associated with the feature.
     /// </summary>
     [Description("Free-form metadata bag containing additional feature attributes.")]
