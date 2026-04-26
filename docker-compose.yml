@@ -28,11 +28,11 @@ services:
     restart: unless-stopped
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_HTTP_PORTS: 8080
+      ASPNETCORE_HTTP_PORTS: ${APP_HOST_PORT:-5121}
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
       Database__ConnectionString: Host=db;Port=5432;Database=openlayers_demo;Username=openlayers;Password=openlayers_dev_password;Include Error Detail=true
     ports:
-      - "${APP_HOST_PORT:-5121}:8080"
+      - "${APP_HOST_PORT:-5121}:${APP_HOST_PORT:-5121}"
     volumes:
       - .:/src
       - app-bin:/src/.build/bin

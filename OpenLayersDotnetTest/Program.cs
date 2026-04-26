@@ -61,7 +61,13 @@ app.UseAntiforgery();
 app.MapOpenApi();
 app.MapGet("/scalar", () => Results.Redirect("/scalar/v1", permanent: false))
     .ExcludeFromDescription();
-app.MapScalarApiReference("/scalar");
+app.MapScalarApiReference("/scalar", options =>
+{
+    options.WithTitle("OpenLayersDotnetTest Scalar API")
+    .ExpandAllModelSections()
+    .ExpandAllTags()
+    .ExpandAllResponses();
+});
 app.MapStaticAssets();
 app.MapControllers();
 app.MapRazorComponents<App>()

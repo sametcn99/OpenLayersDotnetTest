@@ -11,10 +11,10 @@ RUN dotnet restore OpenLayersDotnetTest/OpenLayersDotnetTest.csproj
 FROM restore AS development
 WORKDIR /src/OpenLayersDotnetTest
 
-ENV ASPNETCORE_HTTP_PORTS=8080 \
+ENV ASPNETCORE_HTTP_PORTS=5121 \
 	DOTNET_USE_POLLING_FILE_WATCHER=1
 
-EXPOSE 8080
+EXPOSE 5121
 
 CMD ["dotnet", "watch", "run", "--no-launch-profile"]
 
@@ -30,8 +30,8 @@ RUN apt-get update \
 	&& apt-get install -y --no-install-recommends libgssapi-krb5-2 \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV ASPNETCORE_HTTP_PORTS=8080
-EXPOSE 8080
+ENV ASPNETCORE_HTTP_PORTS=5121
+EXPOSE 5121
 
 COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "OpenLayersDotnetTest.dll"]
